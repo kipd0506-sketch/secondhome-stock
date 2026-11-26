@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>세컨드홈 재고 대시보드</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#f5f6f8;color:#222}
+header{background:#1f2937;color:#fff;padding:16px 24px}
+header h1{margin:0;font-size:20px}
+.meta{font-size:13px;opacity:.85;margin-top:6px}
+main{padding:20px 24px;max-width:1200px;margin:auto}
+.card{background:#fff;border-radius:10px;padding:16px 18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+h2{font-size:16px;margin:0 0 10px}
+.warn li{margin:6px 0;color:#b91c1c}
+.neg{color:#dc2626;font-weight:600}
+.down{color:#dc2626}
+.up{color:#16a34a}
+input,select{padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:14px;margin-right:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid #eee;text-align:left}
+th{background:#f9fafb;position:sticky;top:0}
+.num{text-align:right}
+.scroll{max-height:600px;overflow:auto}
+</style>
+</head>
+<body>
+<header>
+<h1>세컨드홈 재고 대시보드</h1>
+<div class="meta" id="meta"></div>
+</header>
+<main>
+<div class="card">
+<h2>⚠ 재고 급감 Top 5 (직전 수집 대비)</h2>
+<ul class="warn" id="top"></ul>
+</div>
+<div class="card">
+<h2>재고 목록</h2>
+<div style="margin-bottom:10px">
+<select id="cat"></select><input id="q" placeholder="상품명 검색"><span id="cnt" style="font-size:13px;color:#666"></span>
+</div>
+<div class="scroll">
+<table>
+<thead><tr><th>상품명</th><th>옵션명</th><th>카테고리</th><th class="num">재고</th><th class="num">직전</th><th class="num">변화</th><th class="num">안전수량</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+</div>
+</div>
+<p style="font-size:12px;color:#777">※ [손실], [물류 샘플], [세컨드홈 샘플], [쿠팡 그로스] 표시 상품은 집계에서 제외됩니다.</p>
+</main>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = n => n == null ? "-" : Number(n).toLocaleString("ko-KR");
+fetch("data.json?t=" + Date.now()).then(r => r.json()).then(d => {
+  document.getElementById("meta").textContent = `최신 수집 ${d.time} · 직전 수집 ${d.prev_time || "없음"} · 재고 있는 상품 ${d.total}개`;
+  const items = d.items;
+  const drops = items.filter(i => i.diff != null && i.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, 5);
+  const topEl = document.getElementById("top");
+  topEl.innerHTML = drops.length
+    ? drops.map(i => `<li>${esc(i.n)} (${esc(i.o)}) 재고 ${fmt(i.prev)}개 → ${fmt(i.cur)}개 (${fmt(i.diff)}개)</li>`).join("")
+    : "<li style='color:#555'>급감 상품이 없거나 아직 비교할 직전 수집이 없습니다.</li>";
+  const catSel = document.getElementById("cat");
+  const cats = ["전체", ...[...new Set(items.map(i => i.c))].sort()];
+  catSel.innerHTML = cats.map(c => `<option>${esc(c)}</option>`).join("");
+  const draw = () => {
+    const cat = catSel.value;
+    const q = document.getElementById("q").value.trim().toLowerCase();
+    const list = items.filter(i => (cat === "전체" || i.c === cat) && (!q || (i.n + " " + i.o).toLowerCase().includes(q)));
+    document.getElementById("cnt").textContent = ` ${list.length}개`;
+    document.getElementById("rows").innerHTML = list.map(i => {
+      const cls = i.diff == null ? "" : (i.diff < 0 ? "down" : (i.diff > 0 ? "up" : ""));
+      const diffTxt = i.diff == null ? "-" : (i.diff > 0 ? "+" : "") + fmt(i.diff);
+      return `<tr><td>${esc(i.n)}</td><td>${esc(i.o)}</td><td>${esc(i.c)}</td><td class="num ${i.cur < 0 ? "neg" : ""}">${fmt(i.cur)}</td><td class="num">${fmt(i.prev)}</td><td class="num ${cls}">${diffTxt}</td><td class="num">${fmt(i.safe)}</td></tr>`;
+    }).join("");
+  };
+  catSel.onchange = draw;
+  document.getElementById("q").oninput = draw;
+  draw();
+}).catch(e => { document.getElementById("meta").textContent = "데이터를 불러오지 못했습니다: " + e; });
+</script>
+</body>
+</html>
