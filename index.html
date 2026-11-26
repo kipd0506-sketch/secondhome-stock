@@ -53,6 +53,7 @@ tr.cathead td{background:#1e2545;font-weight:600;color:#c7d2fe}
 .subtbl th{position:static;background:#1a2030;font-size:12px}
 .subtbl td{font-size:12px;padding:7px 10px}
 .rank{display:inline-block;width:22px;color:var(--mute)}
+.pl{color:inherit;text-decoration:underline;text-decoration-style:dotted;cursor:pointer}
 .foot{font-size:12px;color:var(--mute);margin-top:14px}
 </style>
 </head>
@@ -170,17 +171,17 @@ function start(d) {
   document.getElementById("k-stale").textContent = fmt(staleList.length);
 
   const alertHTML = (list, cls, label, empty) => list.length
-    ? list.slice(0, 5).map(p => `<div class="alert ${cls}"><div class="n"><span class="badge ${cls}">${label}</span>${esc(p.n)}</div><div class="d">재고 ${fmt(p.yest)}개 → <b>${fmt(p.cur)}개</b> (${sgn(p.diff)}개)</div></div>`).join("")
+    ? list.slice(0, 5).map(p => `<div class="alert ${cls}"><div class="n"><span class="badge ${cls}">${label}</span><a class="pl" data-n="${esc(p.n)}">${esc(p.n)}</a></div><div class="d">재고 ${fmt(p.yest)}개 → <b>${fmt(p.cur)}개</b> (${sgn(p.diff)}개)</div></div>`).join("")
     : `<div class="empty">${empty}</div>`;
   document.getElementById("down").innerHTML = alertHTML(downList, "", "급감", "전일 대비 감소한 상품이 없습니다.");
   document.getElementById("up").innerHTML = alertHTML(upList, "up", "급상승", "전일 대비 증가한 상품이 없습니다.");
 
   const top10 = [...products].sort((a, b) => b.cur - a.cur).slice(0, 10);
   document.getElementById("top10").innerHTML = top10.map((p, i) =>
-    `<tr><td><span class="rank">${i + 1}</span>${esc(p.n)}</td><td>${esc(p.c)}</td><td class="r">${fmt(p.cur)}</td></tr>`).join("");
+    `<tr><td><span class="rank">${i + 1}</span><a class="pl" data-n="${esc(p.n)}">${esc(p.n)}</a></td><td>${esc(p.c)}</td><td class="r">${fmt(p.cur)}</td></tr>`).join("");
 
   document.getElementById("stale").innerHTML = staleList.length
-    ? staleList.map(p => `<tr><td>${esc(p.n)}</td><td>${esc(p.c)}</td><td class="r">${fmt(p.cur)}</td><td class="r">${esc(p.last)}</td><td class="r">${p.idle}일</td></tr>`).join("")
+    ? staleList.map(p => `<tr><td><a class="pl" data-n="${esc(p.n)}">${esc(p.n)}</a></td><td>${esc(p.c)}</td><td class="r">${fmt(p.cur)}</td><td class="r">${esc(p.last)}</td><td class="r">${p.idle}일</td></tr>`).join("")
     : `<tr><td colspan="5" class="empty">15일 이상 재고 변동이 없는 상품이 없습니다.</td></tr>`;
 
   const cats = ["전체", ...[...new Set(products.map(p => p.c))].sort()];
@@ -234,6 +235,20 @@ function start(d) {
   document.querySelector(".seg").onclick = e => { const m = e.target.dataset.m; if (m) { mode = m; draw(); } };
   document.getElementById("q").oninput = e => { q = e.target.value.trim().toLowerCase(); draw(); };
   document.getElementById("sort").onchange = draw;
+
+  // 상단 카드/표의 상품명을 누르면 필터를 풀고 재고 목록에서 해당 상품을 펼쳐 보여줌
+  const focusProduct = name => {
+    cat = "전체"; q = ""; mode = "product";
+    document.getElementById("q").value = "";
+    openKeys.add(name);
+    draw();
+    const row = document.querySelector(`tr.prod[data-key="${CSS.escape(name)}"]`);
+    if (row) row.scrollIntoView({behavior: "smooth", block: "center"});
+  };
+  document.addEventListener("click", e => {
+    const el = e.target.closest("[data-n]");
+    if (el) focusProduct(el.dataset.n);
+  });
   draw();
 }
 </script>
